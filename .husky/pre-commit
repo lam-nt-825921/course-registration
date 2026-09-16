@@ -1,0 +1,12 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+echo "==============================="
+echo "🦊 Chạy Husky cho Frontend..."
+echo "==============================="
+(cd frontend && sh .husky/pre-commit)
+
+echo "==============================="
+echo "🦊 Chạy Husky cho Backend..."
+echo "==============================="
+(cd backend && sh .husky/pre-commit)

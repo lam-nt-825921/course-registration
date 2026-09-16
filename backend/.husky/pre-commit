@@ -1,0 +1,2 @@
+#!/bin/sh
+echo "Backend checks pass (Placeholder)"

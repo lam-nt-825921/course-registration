@@ -41,3 +41,26 @@ course-registration/
 Bạn vui lòng đọc hướng dẫn chi tiết trong từng thư mục:
 - 👉 [Hướng dẫn khởi chạy Frontend](./frontend/README.md)
 - 👉 [Hướng dẫn khởi chạy Backend](./backend/README.md)
+
+## 🐶 Quy trình Quản lý Code & Git Hooks (Husky)
+
+Dự án áp dụng mô hình **Root Husky** điều phối 2 child huskies ở `frontend` và `backend`. Điều này đảm bảo mọi dòng code được kiểm tra nghiêm ngặt trước khi commit.
+
+### Hướng dẫn cài đặt Hooks
+Chạy lệnh sau tại **thư mục gốc (root)** của dự án:
+```bash
+pnpm install
+```
+*(Lệnh này sẽ tự động kích hoạt Husky. Khi bạn commit, nó sẽ lần lượt gọi linter của cả frontend và backend).*
+
+### Quy ước Commit (Conventional Commits)
+Bắt buộc sử dụng cấu trúc: `<type>(<scope>): <subject>`
+- `feat`: Thêm tính năng mới (Ví dụ: `feat(auth): thêm api đăng nhập JWT`)
+- `fix`: Sửa lỗi bug (Ví dụ: `fix(course): sửa lỗi tràn UI nút đăng ký`)
+- `docs`: Cập nhật tài liệu (Ví dụ: `docs: update README`)
+- `refactor`: Tối ưu code không làm thay đổi logic
+- `test`: Thêm/sửa Unit Test
+
+### Quy ước Code
+- **Frontend**: Tuân thủ ESLint (Flat Config) và Prettier. Không được có lỗi `any` hoặc `ts-error`.
+- **Backend**: Tuân thủ PEP8, sử dụng `black` hoặc `flake8` để format code.
