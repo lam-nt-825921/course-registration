@@ -1,16 +1,16 @@
-from app.domain.entities.course import Course
-from app.domain.repositories.course_repository import CourseRepository
+from src.domain.entities.course import Course
+from src.domain.repositories.course_repository import CourseRepository
 
 # CHÚ Ý: Tầng này KHÔNG import fastapi hay sqlalchemy
 class CourseService:
     def __init__(self, course_repo: CourseRepository):
         self.course_repo = course_repo
 
-    def get_all_courses(self) -> list[Course]:
-        return self.course_repo.get_all()
+    async def get_all_courses(self) -> list[Course]:
+        return await self.course_repo.get_all()
 
-    def register_course(self, course_id: int, student_id: int) -> bool:
-        course = self.course_repo.get_by_id(course_id)
+    async def register_course(self, course_id: int, student_id: int) -> bool:
+        course = await self.course_repo.get_by_id(course_id)
         if not course:
             raise ValueError("Course not found")
         
@@ -19,5 +19,5 @@ class CourseService:
         
         # In a real app, you would also save the student-course relationship
         course.registered_slots += 1
-        self.course_repo.save(course)
+        await self.course_repo.save(course)
         return True
