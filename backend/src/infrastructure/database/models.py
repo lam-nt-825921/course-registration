@@ -91,6 +91,7 @@ class RegistrationSession(Base):
     semester_id = Column(Integer, ForeignKey("semesters.id"))
     allowed_cohorts = Column(JSONB, nullable=False)
     start_time = Column(DateTime)
+    end_time = Column(DateTime)
 
     semester = relationship("Semester", back_populates="sessions")
 
