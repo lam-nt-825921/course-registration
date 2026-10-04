@@ -22,6 +22,22 @@ class SqlCourseRepository(CourseRepository):
         model = self.session.query(CourseModel).filter(CourseModel.id == course_id).first()
         return self._to_entity(model) if model else None
 
+    def get_by_id_for_update(self, course_id: int) -> Optional[Course]:
+        """
+        Lấy Course và khóa row bằng SELECT ... FOR UPDATE.
+
+        PostgreSQL sẽ giữ row lock cho đến khi transaction
+        được commit hoặc rollback.
+        """
+        model = (
+            self.session.query(CourseModel)
+            .filter(CourseModel.id == course_id)
+            .with_for_update()
+            .first()
+        )
+
+        return self._to_entity(model) if model else None
+
     def get_all(self) -> List[Course]:
         models = self.session.query(CourseModel).all()
         return [self._to_entity(m) for m in models]

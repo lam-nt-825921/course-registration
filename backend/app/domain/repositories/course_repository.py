@@ -8,6 +8,14 @@ class CourseRepository(ABC):
         pass
 
     @abstractmethod
+    def get_by_id_for_update(self, course_id: int) -> Optional[Course]:
+        """
+        Lấy Course và khóa row trong database để tránh
+        race condition khi nhiều người đăng ký cùng lúc.
+        """
+        pass
+
+    @abstractmethod
     def get_all(self) -> List[Course]:
         pass
 

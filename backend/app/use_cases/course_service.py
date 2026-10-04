@@ -10,7 +10,9 @@ class CourseService:
         return self.course_repo.get_all()
 
     def register_course(self, course_id: int, student_id: int) -> bool:
-        course = self.course_repo.get_by_id(course_id)
+        # course = self.course_repo.get_by_id(course_id)
+        # Lấy Course kèm row lock để chống overselling.
+        course = self.course_repo.get_by_id_for_update(course_id)
         if not course:
             raise ValueError("Course not found")
         
