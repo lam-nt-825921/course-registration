@@ -5,7 +5,14 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "prepare": "husky"
+    "prepare": "husky",
+    "db:up": "docker compose up -d db redis",
+    "db:down": "docker compose down",
+    "db:migrate": "cd backend && PYTHONPATH=. venv/bin/alembic upgrade head",
+    "db:seed": "cd backend && PYTHONPATH=. venv/bin/python seed.py",
+    "be:dev": "cd backend && PYTHONPATH=. venv/bin/uvicorn main:app --reload",
+    "be:test": "cd backend && PYTHONPATH=. venv/bin/pytest tests/",
+    "setup": "pnpm run db:up && echo \"Waiting for DB to start...\" && sleep 5 && pnpm run db:migrate && pnpm run db:seed"
   },
   "keywords": [],
   "author": "",

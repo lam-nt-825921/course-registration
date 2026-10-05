@@ -34,6 +34,12 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(courses.router, prefix="/api/courses", tags=["Courses"])
+from src.api.endpoints import admin, external_sis
+
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
+
+app.include_router(external_sis.router, prefix="/api/external-sis", tags=["External SIS Mock"])
+
 
 @app.get("/health")
 def health_check():
