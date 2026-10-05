@@ -1,6 +1,9 @@
 from uuid import UUID
 from typing import List, Optional
 from src.domain.entities.registration import CourseClass, Enrollment
+from datetime import datetime
+from sqlalchemy import select
+from src.infrastructure.database.models import RegistrationSession
 import uuid
 
 class CourseService:
@@ -13,10 +16,27 @@ class CourseService:
         # Pass filters to repository
         return await self.course_class_repo.get_all(keyword=keyword, can_register=can_register, day_of_week=day_of_week, course_type=course_type)
 
-    async def register_course(self, class_id: UUID, student_id: UUID) -> bool:
+    async def _check_session(self, student):
+        now = datetime.now()
+        stmt = select(RegistrationSession).where(
+            RegistrationSession.is_cancelled == False,
+            RegistrationSession.start_time <= now,
+            RegistrationSession.end_time >= now
+        )
+        result = await self.course_class_repo.session.execute(stmt)
+        sessions = result.scalars().all()
+        for session in sessions:
+            if student.cohort in session.allowed_cohorts:
+                return True
+        return False
+
+    async def register_course(self, class_id: UUID, student_id: UUID, ip_address: str = None) -> bool:
         student = await self.student_repo.get_by_id(student_id)
         if not student:
             raise ValueError("Không tìm thấy sinh viên")
+            
+        if not await self._check_session(student):
+            raise ValueError("Ngoài thời gian đăng ký của bạn")
 
         course_class = await self.course_class_repo.get_by_id_for_update(class_id)
         if not course_class:
@@ -46,6 +66,10 @@ class CourseService:
         enrollment = Enrollment(id=uuid.uuid4(), student_id=student_id, course_class=course_class, status="enrolled")
         await self.enrollment_repo.create(enrollment)
         
+        from src.infrastructure.database.models import AuditLog
+        log = AuditLog(student_id=student_id, course_class_id=class_id, action="ENROLLED", ip_address=ip_address)
+        self.course_class_repo.session.add(log)
+        await self.course_class_repo.session.flush()
         return True
 
     async def get_my_schedule(self, student_id: UUID) -> list:
@@ -54,7 +78,11 @@ class CourseService:
             return []
         return [e.course_class for e in student.enrollments if e.status == "enrolled"]
 
-    async def cancel_registration(self, class_id: UUID, student_id: UUID) -> bool:
+    async def cancel_registration(self, class_id: UUID, student_id: UUID, ip_address: str = None) -> bool:
+        student = await self.student_repo.get_by_id(student_id)
+        if not await self._check_session(student):
+            raise ValueError("Ngoài thời gian đăng ký của bạn")
+            
         # Khóa class để trả slot
         course_class = await self.course_class_repo.get_by_id_for_update(class_id)
         if not course_class:
@@ -67,6 +95,11 @@ class CourseService:
         # Trả slot
         course_class.current_capacity -= 1
         await self.course_class_repo.save(course_class)
+        
+        from src.infrastructure.database.models import AuditLog
+        log = AuditLog(student_id=student_id, course_class_id=class_id, action="CANCELLED", ip_address=ip_address)
+        self.course_class_repo.session.add(log)
+        await self.course_class_repo.session.flush()
         return True
         
     async def get_enrollment_history(self, student_id: UUID) -> list:

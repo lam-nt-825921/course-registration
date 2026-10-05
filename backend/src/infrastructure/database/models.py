@@ -55,6 +55,7 @@ class Course(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     course_code = Column(String, unique=True, nullable=False)
+    name = Column(String, nullable=False, server_default="Unknown")
     credits = Column(Integer, nullable=False)
     course_type = Column(Enum(CourseTypeEnum), nullable=False)
 
@@ -91,8 +92,24 @@ class RegistrationSession(Base):
     semester_id = Column(Integer, ForeignKey("semesters.id"))
     allowed_cohorts = Column(JSONB, nullable=False)
     start_time = Column(DateTime)
+    end_time = Column(DateTime)
+    is_cancelled = Column(Boolean, default=False)
 
     semester = relationship("Semester", back_populates="sessions")
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    student_id = Column(UUID(as_uuid=True), ForeignKey("students.user_id"), nullable=False)
+    course_class_id = Column(UUID(as_uuid=True), ForeignKey("course_classes.id"), nullable=False)
+    action = Column(String, nullable=False) # 'ENROLLED', 'CANCELLED'
+    ip_address = Column(String, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+
+    student = relationship("Student")
+    course_class = relationship("CourseClass")
 
 
 class CourseClass(Base):
@@ -102,6 +119,8 @@ class CourseClass(Base):
     class_code = Column(String, unique=True, nullable=False)
     course_id = Column(Integer, ForeignKey("courses.id"))
     semester_id = Column(Integer, ForeignKey("semesters.id"))
+    room = Column(String, nullable=True)
+    lecturer = Column(String, nullable=True)
     max_capacity = Column(Integer, nullable=False)
     current_capacity = Column(Integer, default=0)
 

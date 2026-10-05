@@ -19,16 +19,50 @@ async def get_courses(
     current_user: dict = Depends(get_current_student)
 ):
     classes = await service.get_all_courses(keyword, can_register, day_of_week, course_type)
+    student_id = current_user["student_id"]
+    
+    student = await service.student_repo.get_by_id(student_id)
+    if not await service._check_session(student):
+        raise HTTPException(status_code=403, detail="Ngoài thời gian đăng ký của bạn")
+    
+    def check_valid(c_class) -> bool:
+        if not student: return True
+        course = c_class.course
+        if student.get_total_registered_credits() + course.credits > 25:
+            return False
+        if course.course_type == "physical_education" and student.count_physical_education_courses() >= 1:
+            # But wait, if they ALREADY registered this EXACT class, the check would fail and mark it invalid?
+            # No, if they already registered it, they don't count it as a new class. But wait, if they already registered it, it's fine if is_valid is false because the UI logic checks `isRegistered` and bypasses the disable logic.
+            pass
+        # We need to skip checking for classes they ALREADY enrolled in
+        is_enrolled = any(e.course_class.id == c_class.id and e.status == "enrolled" for e in student.enrollments)
+        if is_enrolled:
+            return True
+            
+        if course.course_type == "physical_education" and student.count_physical_education_courses() >= 1:
+            return False
+        for prereq_id in course.prerequisite_course_ids:
+            if not student.has_passed_course(prereq_id):
+                return False
+        if student.has_schedule_conflict(c_class.schedules):
+            return False
+        return True
+
     return [
         CourseClassResponse(
             id=c.id,
             class_code=c.class_code,
             course_code=c.course.code,
+            course_name=c.course.name,
             credits=c.course.credits,
             course_type=c.course.course_type,
             max_capacity=c.max_capacity,
             current_capacity=c.current_capacity,
-            schedules=c.schedules
+            schedules=c.schedules,
+            room=c.room,
+            lecturer=c.lecturer,
+            note="Học lại" if student and student.has_taken_course(c.course.id) else "Học lần đầu",
+            is_valid=check_valid(c)
         ) for c in classes
     ]
 
@@ -41,16 +75,21 @@ async def get_my_schedule(
     # In a real app we parse student_id from current_user JWT. For now assuming it's available or mocking it.
     student_id = current_user["student_id"] 
     classes = await service.get_my_schedule(student_id)
+    student = await service.student_repo.get_by_id(student_id)
     return [
         CourseClassResponse(
             id=c.id,
             class_code=c.class_code,
             course_code=c.course.code,
+            course_name=c.course.name,
             credits=c.course.credits,
             course_type=c.course.course_type,
             max_capacity=c.max_capacity,
             current_capacity=c.current_capacity,
-            schedules=c.schedules
+            schedules=c.schedules,
+            room=c.room,
+            lecturer=c.lecturer,
+            note="Học lại" if student and student.has_taken_course(c.course.id) else "Học lần đầu"
         ) for c in classes
     ]
 

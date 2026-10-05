@@ -19,6 +19,11 @@ class CourseClassResponse(BaseModel):
     max_capacity: int
     current_capacity: int
     schedules: List[ClassScheduleSchema]
+    is_valid: bool = Field(True, description="Học phần hợp lệ (không trùng lịch, v.v.)")
+    room: str = Field(..., description="Phòng học")
+    lecturer: str = Field(..., description="Giảng viên")
+    note: str = Field(..., description="Ghi chú (Học lại/Lần đầu)")
+    course_name: str = Field(..., description="Tên môn học")
 
     class Config:
         from_attributes = True
@@ -31,7 +36,6 @@ class EnrollmentHistoryResponse(BaseModel):
         from_attributes = True
 
 class RegisterCourseRequest(BaseModel):
-    student_id: UUID4 = Field(..., description="Mã sinh viên đăng ký")
     course_class_id: UUID4 = Field(..., description="Mã lớp học phần (UUID)")
 
 class MessageResponse(BaseModel):

@@ -17,6 +17,7 @@ class ClassSchedule:
 class Course:
     id: int
     code: str
+    name: str
     credits: int
     course_type: str
     prerequisite_course_ids: List[int] = field(default_factory=list)
@@ -26,6 +27,8 @@ class CourseClass:
     id: UUID
     class_code: str
     course: Course
+    room: str
+    lecturer: str
     max_capacity: int
     current_capacity: int = 0
     schedules: List[ClassSchedule] = field(default_factory=list)
@@ -48,20 +51,26 @@ class AcademicTranscript:
 @dataclass
 class Student:
     id: UUID
+    cohort: str = ""
     enrollments: List[Enrollment] = field(default_factory=list)
     transcripts: List[AcademicTranscript] = field(default_factory=list)
 
     def get_total_registered_credits(self) -> int:
-        return sum(e.course_class.course.credits for e in self.enrollments if e.course_class.course.course_type != "physical_education")
+        return sum(e.course_class.course.credits for e in self.enrollments if e.course_class.course.course_type != "physical_education" and e.status == "enrolled")
     
     def count_physical_education_courses(self) -> int:
-        return sum(1 for e in self.enrollments if e.course_class.course.course_type == "physical_education")
+        return sum(1 for e in self.enrollments if e.course_class.course.course_type == "physical_education" and e.status == "enrolled")
 
     def has_passed_course(self, course_id: int) -> bool:
         return any(t.course_id == course_id and t.status == "passed" for t in self.transcripts)
+        
+    def has_taken_course(self, course_id: int) -> bool:
+        return any(t.course_id == course_id for t in self.transcripts)
 
     def has_schedule_conflict(self, new_schedules: List[ClassSchedule]) -> bool:
         for e in self.enrollments:
+            if e.status != "enrolled":
+                continue
             for s1 in e.course_class.schedules:
                 for s2 in new_schedules:
                     if s1.conflicts_with(s2):

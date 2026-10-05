@@ -24,6 +24,7 @@ class SQLCourseClassRepository:
         course_domain = Course(
             id=model.course.id,
             code=model.course.course_code,
+            name=model.course.name,
             credits=model.course.credits,
             course_type=model.course.course_type.value if hasattr(model.course.course_type, 'value') else model.course.course_type,
             prerequisite_course_ids=prereqs
@@ -32,6 +33,8 @@ class SQLCourseClassRepository:
             id=model.id,
             class_code=model.class_code,
             course=course_domain,
+            room=model.room or "",
+            lecturer=model.lecturer or "",
             max_capacity=model.max_capacity,
             current_capacity=model.current_capacity,
             schedules=schedules
@@ -61,7 +64,7 @@ class SQLCourseClassRepository:
         stmt = select(CourseClassModel).options(
             selectinload(CourseClassModel.course).selectinload(CourseModel.prerequisites),
             selectinload(CourseClassModel.schedules)
-        )
+        ).order_by(CourseClassModel.class_code)
         result = await self.session.execute(stmt)
         models = result.scalars().all()
         return [self._to_domain(m) for m in models]
@@ -93,6 +96,7 @@ class SQLStudentRepository:
             course_domain = Course(
                 id=e.course_class.course.id,
                 code=e.course_class.course.course_code,
+                name=e.course_class.course.name,
                 credits=e.course_class.course.credits,
                 course_type=e.course_class.course.course_type.value if hasattr(e.course_class.course.course_type, 'value') else e.course_class.course.course_type
             )
@@ -100,13 +104,15 @@ class SQLStudentRepository:
                 id=e.course_class.id,
                 class_code=e.course_class.class_code,
                 course=course_domain,
+                room=e.course_class.room or "",
+                lecturer=e.course_class.lecturer or "",
                 max_capacity=e.course_class.max_capacity,
                 current_capacity=e.course_class.current_capacity,
                 schedules=schedules
             )
             enrollments.append(Enrollment(id=e.id, student_id=e.student_id, course_class=cc_domain, status=e.status.value if hasattr(e.status, 'value') else e.status))
             
-        return Student(id=model.user_id, enrollments=enrollments, transcripts=transcripts)
+        return Student(id=model.user_id, cohort=model.cohort, enrollments=enrollments, transcripts=transcripts)
 
 class SQLEnrollmentRepository:
     def __init__(self, session: Session):

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/store/useAuthStore';
+import { parseJwt } from '@/lib/jwt';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -39,14 +40,22 @@ export default function LoginPage() {
     mutationFn: loginApi,
     onSuccess: (data) => {
       toast.success('Đăng nhập thành công');
-      login(studentId, data.access_token || 'dummy_token');
-      router.push('/');
+      const token = data.access_token;
+      const decoded = parseJwt(token);
+      const role = decoded?.role || 'student';
+      login(studentId, role, token);
+      
+      if (role === 'admin') {
+        router.push('/admin');
+      } else {
+        router.push('/');
+      }
     },
     onError: (error: Error) => {
       toast.error(error.message);
       if (error.message === 'Failed to fetch') {
         toast.info('Đăng nhập với chế độ Mock (API chưa có)');
-        login(studentId, 'mock_token');
+        login(studentId, 'student', 'mock_token');
         router.push('/');
       }
     },
@@ -55,7 +64,7 @@ export default function LoginPage() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (!studentId.trim()) {
-      toast.warning('Vui lòng nhập mã sinh viên');
+      toast.warning('Vui lòng nhập mã sinh viên/username');
       return;
     }
     if (!password.trim()) {
@@ -70,20 +79,20 @@ export default function LoginPage() {
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm">
         <h1 className="mb-2 text-2xl font-bold text-zinc-900">Đăng nhập</h1>
         <p className="mb-6 text-sm text-zinc-600">
-          Nhập mã sinh viên và mật khẩu để truy cập hệ thống.
+          Nhập mã người dùng và mật khẩu để truy cập hệ thống.
         </p>
 
         <form onSubmit={handleLogin} className="flex flex-col gap-4">
           <div>
             <label htmlFor="studentId" className="mb-2 block text-sm font-medium text-zinc-700">
-              Mã sinh viên
+              Tên đăng nhập
             </label>
             <input
               id="studentId"
               type="text"
               value={studentId}
               onChange={(e) => setStudentId(e.target.value)}
-              placeholder="VD: 20020000"
+              placeholder="VD: 20020000 hoặc admin@vnu.edu.vn"
               className="w-full rounded-lg border border-zinc-300 px-4 py-3 outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200"
             />
           </div>
