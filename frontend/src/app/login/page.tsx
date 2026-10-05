@@ -8,14 +8,17 @@ import { useAuthStore } from '@/store/useAuthStore';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-const loginApi = async (studentId: string) => {
-  // Note: Replace this with the actual auth API from T2 when merged
+const loginApi = async ({ studentId, password }: { studentId: string; password: string }) => {
+  const formData = new URLSearchParams();
+  formData.append('username', studentId);
+  formData.append('password', password);
+
   const response = await fetch(`${API_URL}/api/auth/login`, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded',
     },
-    body: JSON.stringify({ student_id: studentId }),
+    body: formData.toString(),
   });
 
   if (!response.ok) {
@@ -23,11 +26,12 @@ const loginApi = async (studentId: string) => {
     throw new Error(errorData.detail || 'Đăng nhập thất bại');
   }
 
-  return response.json(); // { access_token: "..." }
+  return response.json();
 };
 
 export default function LoginPage() {
   const [studentId, setStudentId] = useState('');
+  const [password, setPassword] = useState('');
   const router = useRouter();
   const login = useAuthStore((state) => state.login);
 
@@ -35,13 +39,11 @@ export default function LoginPage() {
     mutationFn: loginApi,
     onSuccess: (data) => {
       toast.success('Đăng nhập thành công');
-      // Assuming token is returned as access_token
       login(studentId, data.access_token || 'dummy_token');
       router.push('/');
     },
     onError: (error: Error) => {
       toast.error(error.message);
-      // Fallback for demo since API auth might not be merged yet
       if (error.message === 'Failed to fetch') {
         toast.info('Đăng nhập với chế độ Mock (API chưa có)');
         login(studentId, 'mock_token');
@@ -56,7 +58,11 @@ export default function LoginPage() {
       toast.warning('Vui lòng nhập mã sinh viên');
       return;
     }
-    mutation.mutate(studentId);
+    if (!password.trim()) {
+      toast.warning('Vui lòng nhập mật khẩu');
+      return;
+    }
+    mutation.mutate({ studentId, password });
   };
 
   return (
@@ -64,7 +70,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm">
         <h1 className="mb-2 text-2xl font-bold text-zinc-900">Đăng nhập</h1>
         <p className="mb-6 text-sm text-zinc-600">
-          Nhập mã sinh viên để truy cập hệ thống đăng ký học phần.
+          Nhập mã sinh viên và mật khẩu để truy cập hệ thống.
         </p>
 
         <form onSubmit={handleLogin} className="flex flex-col gap-4">
@@ -78,6 +84,20 @@ export default function LoginPage() {
               value={studentId}
               onChange={(e) => setStudentId(e.target.value)}
               placeholder="VD: 20020000"
+              className="w-full rounded-lg border border-zinc-300 px-4 py-3 outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="password" className="mb-2 block text-sm font-medium text-zinc-700">
+              Mật khẩu
+            </label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Nhập mật khẩu"
               className="w-full rounded-lg border border-zinc-300 px-4 py-3 outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200"
             />
           </div>
