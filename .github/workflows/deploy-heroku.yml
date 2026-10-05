@@ -1,0 +1,38 @@
+name: Deploy to Heroku
+
+on:
+  push:
+    branches:
+      - master # Chỉ deploy khi code được merge vào master
+
+jobs:
+  deploy-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Deploy Backend to Heroku
+        uses: akhileshns/heroku-deploy@v3.12.12 # Trình deploy Heroku phổ biến
+        with:
+          heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
+          heroku_app_name: "course-registration-backend" # Sẽ thay bằng tên app thật sau
+          heroku_email: ${{ secrets.HEROKU_EMAIL }}
+          usedocker: true # Sử dụng Dockerfile trong thư mục backend để build
+          appdir: "backend" # Trỏ vào thư mục backend
+
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    needs: deploy-backend # Deploy frontend sau khi backend đã lên (để đảm bảo API URL sống)
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Deploy Frontend to Heroku
+        uses: akhileshns/heroku-deploy@v3.12.12
+        with:
+          heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
+          heroku_app_name: "course-registration-frontend" # Sẽ thay bằng tên app thật sau
+          heroku_email: ${{ secrets.HEROKU_EMAIL }}
+          usedocker: true # Sử dụng Dockerfile của frontend
+          appdir: "frontend" # Trỏ vào thư mục frontend
