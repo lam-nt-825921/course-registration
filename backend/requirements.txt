@@ -1,9 +1,13 @@
 fastapi
 uvicorn[standard]
 sqlalchemy
+asyncpg
 alembic
 psycopg2-binary
 pydantic
 pydantic-settings
 PyJWT
 passlib[bcrypt]
+python-multipart
+slowapi
+redis

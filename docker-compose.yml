@@ -1,21 +1,28 @@
+version: '3.8'
 services:
   db:
-    image: postgres:15-alpine
+    image: postgres:15
     container_name: course_db
     restart: always
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: course_db
+      POSTGRES_USER: vnu_user
+      POSTGRES_PASSWORD: vnu_password
+      POSTGRES_DB: course_registration
     ports:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d course_db"]
+      test: ["CMD-SHELL", "pg_isready -U vnu_user -d course_registration"]
       interval: 5s
       timeout: 5s
       retries: 5
+
+  redis:
+    image: redis:7
+    container_name: course_redis
+    ports:
+      - "6379:6379"
 
   backend:
     build: 
@@ -26,18 +33,16 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql+psycopg2://postgres:password@db:5432/course_db
+      - DATABASE_URL=postgresql+asyncpg://vnu_user:vnu_password@db:5432/course_registration
       - SECRET_KEY=supersecretkey123
       - ALGORITHM=HS256
       - ACCESS_TOKEN_EXPIRE_MINUTES=30
     depends_on:
       db:
         condition: service_healthy
-    # Mount source code để sửa code nhận ngay không cần build lại (Hot reload)
     volumes:
       - ./backend:/app
-    # Chạy script seed data trước, sau đó bật uvicorn
-    command: sh -c "python seed.py && uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
+    command: sh -c "alembic upgrade head && python seed.py && uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
 
   frontend:
     build:

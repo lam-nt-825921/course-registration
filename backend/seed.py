@@ -1,42 +1,37 @@
+import asyncio
 import os
 import sys
 
-# Thêm đường dẫn để có thể import từ app
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add path so we can import from src
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from app.infrastructure.database.session import SessionLocal, engine
-from app.infrastructure.database.models import Base, CourseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 
-def seed_data():
-    print("Tạo các bảng (nếu chưa có)...")
-    Base.metadata.create_all(bind=engine)
-    
-    db = SessionLocal()
-    try:
-        # Kiểm tra xem đã có dữ liệu chưa
-        if db.query(CourseModel).count() > 0:
+from src.infrastructure.database.session import AsyncSessionLocal
+from src.infrastructure.database.models import Course, CourseTypeEnum
+
+async def seed_data():
+    async with AsyncSessionLocal() as session:
+        # Check if we already have data
+        result = await session.execute(select(Course))
+        if result.scalars().first() is not None:
             print("Dữ liệu đã tồn tại. Bỏ qua seeding.")
             return
 
         print("Đang thêm Seed Data cho môn học...")
         courses = [
-            CourseModel(code="INT3306", name="Kiến trúc phần mềm", credits=3, max_slots=60, registered_slots=0),
-            CourseModel(code="INT3110", name="Phân tích thiết kế hệ thống", credits=3, max_slots=50, registered_slots=0),
-            CourseModel(code="INT3202", name="Hệ quản trị cơ sở dữ liệu", credits=3, max_slots=40, registered_slots=0),
-            CourseModel(code="INT3301", name="Phát triển ứng dụng Web", credits=3, max_slots=30, registered_slots=0),
-            CourseModel(code="INT3307", name="An toàn và bảo mật hệ thống thông tin", credits=3, max_slots=60, registered_slots=0),
-            CourseModel(code="INT3308", name="Mạng máy tính nâng cao", credits=3, max_slots=5, registered_slots=0), # Môn này set max_slots nhỏ để dễ test Overselling
+            Course(course_code="INT3306", credits=3, course_type=CourseTypeEnum.normal),
+            Course(course_code="INT3110", credits=3, course_type=CourseTypeEnum.normal),
+            Course(course_code="INT3202", credits=3, course_type=CourseTypeEnum.normal),
+            Course(course_code="INT3301", credits=3, course_type=CourseTypeEnum.normal),
+            Course(course_code="INT3307", credits=3, course_type=CourseTypeEnum.normal),
+            Course(course_code="INT3308", credits=3, course_type=CourseTypeEnum.normal),
         ]
         
-        db.add_all(courses)
-        db.commit()
+        session.add_all(courses)
+        await session.commit()
         print("Seed Data thành công!")
-        
-    except Exception as e:
-        print(f"Lỗi khi seed data: {e}")
-        db.rollback()
-    finally:
-        db.close()
 
 if __name__ == "__main__":
-    seed_data()
+    asyncio.run(seed_data())

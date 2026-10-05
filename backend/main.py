@@ -1,12 +1,10 @@
 from fastapi import FastAPI
-from app.api.endpoints import courses
-from app.infrastructure.database.models import Base
-from app.infrastructure.database.session import engine
-
 from fastapi.middleware.cors import CORSMiddleware
-
-# Tạo bảng tự động (chỉ dùng khi chưa có Alembic)
-Base.metadata.create_all(bind=engine)
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from src.api.endpoints import courses
+from src.api.auth import endpoints as auth
+from src.application.security.rate_limit import limiter
 
 app = FastAPI(
     title="Course Registration API",
@@ -22,6 +20,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(courses.router, prefix="/api/courses", tags=["Courses"])
 
 @app.get("/health")
