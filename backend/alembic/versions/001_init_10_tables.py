@@ -16,18 +16,28 @@ branch_labels = None
 depends_on = None
 
 def upgrade() -> None:
-    # Create ENUMs
-    role_enum = postgresql.ENUM('student', 'admin', name='roleenum')
-    role_enum.create(op.get_bind())
+    # Create ENUMs securely using DO $$ block to avoid DuplicateObjectError
+    op.execute("""
+    DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'roleenum') THEN
+            CREATE TYPE roleenum AS ENUM ('student', 'admin');
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'coursetypeenum') THEN
+            CREATE TYPE coursetypeenum AS ENUM ('normal', 'physical_education');
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enrollmentstatusenum') THEN
+            CREATE TYPE enrollmentstatusenum AS ENUM ('enrolled', 'cancelled');
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'transcriptstatusenum') THEN
+            CREATE TYPE transcriptstatusenum AS ENUM ('passed', 'failed');
+        END IF;
+    END $$;
+    """)
     
-    course_type_enum = postgresql.ENUM('normal', 'physical_education', name='coursetypeenum')
-    course_type_enum.create(op.get_bind())
-    
-    enrollment_status_enum = postgresql.ENUM('enrolled', 'cancelled', name='enrollmentstatusenum')
-    enrollment_status_enum.create(op.get_bind())
-    
-    transcript_status_enum = postgresql.ENUM('passed', 'failed', name='transcriptstatusenum')
-    transcript_status_enum.create(op.get_bind())
+    role_enum = postgresql.ENUM('student', 'admin', name='roleenum', create_type=False)
+    course_type_enum = postgresql.ENUM('normal', 'physical_education', name='coursetypeenum', create_type=False)
+    enrollment_status_enum = postgresql.ENUM('enrolled', 'cancelled', name='enrollmentstatusenum', create_type=False)
+    transcript_status_enum = postgresql.ENUM('passed', 'failed', name='transcriptstatusenum', create_type=False)
 
     # Create tables
     op.create_table(
