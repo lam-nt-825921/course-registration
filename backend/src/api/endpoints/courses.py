@@ -3,22 +3,33 @@ from typing import List, Optional
 from uuid import UUID
 from src.use_cases.course_service import CourseService
 from src.api.dependencies import get_course_service, get_current_student
-from src.api.schemas import CourseClassResponse, RegisterCourseRequest, MessageResponse, EnrollmentHistoryResponse
+from src.api.schemas import CourseClassResponse, RegisterCourseRequest, MessageResponse, EnrollmentHistoryResponse, PaginatedCourseClassResponse
 from src.application.security.rate_limit import limiter
 
 router = APIRouter()
 
-@router.get("/", response_model=List[CourseClassResponse], summary="Lấy & Lọc Lớp học phần hợp lệ")
+@router.get("/", response_model=PaginatedCourseClassResponse, summary="Lấy & Lọc Lớp học phần hợp lệ")
 async def get_courses(
     request: Request,
     keyword: Optional[str] = Query(None, description="Tìm theo tên môn/mã môn"),
     can_register: Optional[bool] = Query(None, description="Chỉ hiện lớp còn slot"),
     day_of_week: Optional[int] = Query(None, description="Lọc theo thứ (2-8)"),
     course_type: Optional[str] = Query(None, description="Loại môn: normal, physical_education..."),
+    page: int = Query(1, description="Số trang", ge=1),
+    size: int = Query(20, description="Kích thước trang", ge=1, le=100),
     service: CourseService = Depends(get_course_service),
     current_user: dict = Depends(get_current_student)
 ):
-    classes = await service.get_all_courses(keyword, can_register, day_of_week, course_type)
+    paginated = await service.get_all_courses(
+        student_id=current_user["student_id"],
+        keyword=keyword, 
+        can_register=can_register, 
+        day_of_week=day_of_week, 
+        course_type=course_type,
+        page=page,
+        size=size
+    )
+    classes = paginated["items"]
     student_id = current_user["student_id"]
     
     student = await service.student_repo.get_by_id(student_id)
@@ -31,8 +42,6 @@ async def get_courses(
         if student.get_total_registered_credits() + course.credits > 25:
             return False
         if course.course_type == "physical_education" and student.count_physical_education_courses() >= 1:
-            # But wait, if they ALREADY registered this EXACT class, the check would fail and mark it invalid?
-            # No, if they already registered it, they don't count it as a new class. But wait, if they already registered it, it's fine if is_valid is false because the UI logic checks `isRegistered` and bypasses the disable logic.
             pass
         # We need to skip checking for classes they ALREADY enrolled in
         is_enrolled = any(e.course_class.id == c_class.id and e.status == "enrolled" for e in student.enrollments)
@@ -48,7 +57,7 @@ async def get_courses(
             return False
         return True
 
-    return [
+    items = [
         CourseClassResponse(
             id=c.id,
             class_code=c.class_code,
@@ -65,6 +74,9 @@ async def get_courses(
             is_valid=check_valid(c)
         ) for c in classes
     ]
+    
+    paginated["items"] = items
+    return paginated
 
 @router.get("/my-schedule", response_model=List[CourseClassResponse], summary="Xem TKB & Preview")
 async def get_my_schedule(

@@ -60,14 +60,71 @@ class SQLCourseClassRepository:
             self.session.add(model)
             await self.session.flush()
 
-    async def get_all(self, keyword=None, can_register=None, day_of_week=None, course_type=None) -> List[CourseClass]:
+    async def get_all(self, student_id=None, keyword=None, can_register=None, day_of_week=None, course_type=None, page=1, size=20) -> dict:
         stmt = select(CourseClassModel).options(
             selectinload(CourseClassModel.course).selectinload(CourseModel.prerequisites),
             selectinload(CourseClassModel.schedules)
-        ).order_by(CourseClassModel.class_code)
+        ).join(CourseClassModel.course)
+
+        # Filters
+        if keyword:
+            stmt = stmt.where(
+                (CourseClassModel.class_code.ilike(f"%{keyword}%")) |
+                (CourseModel.course_code.ilike(f"%{keyword}%")) |
+                (CourseModel.name.ilike(f"%{keyword}%"))
+            )
+        
+        if can_register is not None:
+            if can_register:
+                stmt = stmt.where(CourseClassModel.current_capacity < CourseClassModel.max_capacity)
+
+        if day_of_week:
+            from src.infrastructure.database.models import ClassSchedule as ClassScheduleModel
+            stmt = stmt.join(CourseClassModel.schedules).where(ClassScheduleModel.day_of_week == day_of_week)
+
+        if course_type:
+            stmt = stmt.where(CourseModel.course_type == course_type)
+        
+        if student_id:
+            student_stmt = select(StudentModel.major_id).where(StudentModel.user_id == student_id)
+            student_res = await self.session.execute(student_stmt)
+            major_id = student_res.scalar()
+
+            if major_id:
+                from src.infrastructure.database.models import MajorCourse
+                # Môn đã được gắn với 1 ngành nào đó
+                mapped_courses = select(MajorCourse.course_id)
+                
+                stmt = stmt.outerjoin(
+                    MajorCourse, CourseModel.id == MajorCourse.course_id
+                ).where(
+                    (MajorCourse.major_id == major_id) | 
+                    (~CourseModel.id.in_(mapped_courses))
+                )
+
+        # Pagination
+        from sqlalchemy import func
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total_result = await self.session.execute(count_stmt)
+        total = total_result.scalar()
+
+        stmt = stmt.order_by(CourseClassModel.class_code).offset((page - 1) * size).limit(size)
+        
         result = await self.session.execute(stmt)
-        models = result.scalars().all()
-        return [self._to_domain(m) for m in models]
+        models = result.scalars().unique().all()
+        
+        items = [self._to_domain(m) for m in models]
+        pages = (total + size - 1) // size if total else 0
+        
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "size": size,
+            "pages": pages,
+            "next": page + 1 if page < pages else None,
+            "prev": page - 1 if page > 1 else None
+        }
 
 
 class SQLStudentRepository:

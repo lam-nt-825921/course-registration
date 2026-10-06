@@ -35,6 +35,15 @@ class EnrollmentHistoryResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class PaginatedCourseClassResponse(BaseModel):
+    items: List[CourseClassResponse]
+    total: int
+    page: int
+    size: int
+    pages: int
+    next: Optional[int]
+    prev: Optional[int]
+
 class RegisterCourseRequest(BaseModel):
     course_class_id: UUID4 = Field(..., description="Mã lớp học phần (UUID)")
 

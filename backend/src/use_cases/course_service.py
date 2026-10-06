@@ -12,9 +12,9 @@ class CourseService:
         self.student_repo = student_repo
         self.enrollment_repo = enrollment_repo
 
-    async def get_all_courses(self, keyword: Optional[str] = None, can_register: Optional[bool] = None, day_of_week: Optional[int] = None, course_type: Optional[str] = None) -> list:
+    async def get_all_courses(self, student_id: UUID, keyword: Optional[str] = None, can_register: Optional[bool] = None, day_of_week: Optional[int] = None, course_type: Optional[str] = None, page: int = 1, size: int = 20) -> dict:
         # Pass filters to repository
-        return await self.course_class_repo.get_all(keyword=keyword, can_register=can_register, day_of_week=day_of_week, course_type=course_type)
+        return await self.course_class_repo.get_all(student_id=student_id, keyword=keyword, can_register=can_register, day_of_week=day_of_week, course_type=course_type, page=page, size=size)
 
     async def _check_session(self, student):
         now = datetime.now()

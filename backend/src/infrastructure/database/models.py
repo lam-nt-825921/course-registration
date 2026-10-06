@@ -44,10 +44,12 @@ class Student(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), primary_key=True)
     student_code = Column(String, unique=True, nullable=False)
     cohort = Column(String, nullable=False)
+    major_id = Column(Integer, ForeignKey("majors.id"), nullable=True)
 
     user = relationship("User", back_populates="student_profile")
     enrollments = relationship("Enrollment", back_populates="student")
     transcripts = relationship("AcademicTranscript", back_populates="student")
+    major = relationship("Major")
 
 
 class Course(Base):
@@ -165,3 +167,17 @@ class AcademicTranscript(Base):
 
     student = relationship("Student", back_populates="transcripts")
     course = relationship("Course", back_populates="transcripts")
+
+
+class Major(Base):
+    __tablename__ = "majors"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String, unique=True, nullable=False)
+
+
+class MajorCourse(Base):
+    __tablename__ = "major_courses"
+    
+    major_id = Column(Integer, ForeignKey("majors.id"), primary_key=True)
+    course_id = Column(Integer, ForeignKey("courses.id"), primary_key=True)

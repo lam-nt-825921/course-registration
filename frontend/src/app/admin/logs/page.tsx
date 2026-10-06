@@ -26,7 +26,11 @@ const fetchLogs = async (token: string): Promise<AuditLog[]> => {
 
 export default function AdminLogsPage() {
   const { token } = useAuthStore();
-  const { data: logs, isLoading, error } = useQuery({
+  const {
+    data: logs,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ['admin-logs'],
     queryFn: () => fetchLogs(token as string),
     enabled: !!token,
@@ -36,7 +40,7 @@ export default function AdminLogsPage() {
   return (
     <div className="rounded-xl bg-white p-6 shadow-sm border border-zinc-200">
       <h2 className="text-xl font-semibold text-zinc-900 mb-6">Audit Logs</h2>
-      
+
       {isLoading ? (
         <p className="text-zinc-500">Đang tải dữ liệu...</p>
       ) : error ? (
@@ -61,15 +65,21 @@ export default function AdminLogsPage() {
                   </td>
                   <td className="px-4 py-3">{log.student_id}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      log.action === 'REGISTER' ? 'bg-blue-100 text-blue-700' :
-                      log.action === 'CANCEL' ? 'bg-orange-100 text-orange-700' :
-                      'bg-zinc-100 text-zinc-700'
-                    }`}>
+                    <span
+                      className={`px-2 py-1 rounded text-xs font-medium ${
+                        log.action === 'ENROLLED'
+                          ? 'bg-blue-100 text-blue-700'
+                          : log.action === 'CANCELLED'
+                            ? 'bg-orange-100 text-orange-700'
+                            : 'bg-zinc-100 text-zinc-700'
+                      }`}
+                    >
                       {log.action}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-zinc-500 font-mono text-xs">{log.course_class_id}</td>
+                  <td className="px-4 py-3 text-zinc-500 font-mono text-xs">
+                    {log.course_class_id}
+                  </td>
                   <td className="px-4 py-3 text-zinc-500">{log.ip_address || 'N/A'}</td>
                 </tr>
               ))}

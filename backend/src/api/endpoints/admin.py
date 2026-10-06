@@ -122,3 +122,13 @@ async def get_cohorts(
     from src.infrastructure.database.models import Student
     result = await service.session.execute(select(Student.cohort).distinct())
     return [row[0] for row in result.all() if row[0]]
+
+@router.get("/semesters", response_model=List[str], summary="Lấy danh sách học kỳ")
+async def get_semesters(
+    service: AdminService = Depends(get_admin_service),
+    current_admin: dict = Depends(get_current_admin)
+):
+    from sqlalchemy import select
+    from src.infrastructure.database.models import Semester
+    result = await service.session.execute(select(Semester.code).order_by(Semester.code.desc()))
+    return [row[0] for row in result.all() if row[0]]

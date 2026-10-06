@@ -68,6 +68,14 @@ const fetchCohorts = async (token: string): Promise<string[]> => {
   return response.json();
 };
 
+const fetchSemesters = async (token: string): Promise<string[]> => {
+  const response = await fetch(`${API_URL}/api/admin/semesters`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) return ['20241', '20242']; // fallback
+  return response.json();
+};
+
 export default function AdminSessionsPage() {
   const { token } = useAuthStore();
   const queryClient = useQueryClient();
@@ -91,6 +99,12 @@ export default function AdminSessionsPage() {
     enabled: !!token,
   });
 
+  const { data: availableSemesters } = useQuery({
+    queryKey: ['admin-semesters'],
+    queryFn: () => fetchSemesters(token as string),
+    enabled: !!token,
+  });
+
   const createMutation = useMutation({
     mutationFn: createSession,
     onSuccess: () => {
@@ -111,7 +125,7 @@ export default function AdminSessionsPage() {
       setSessionToCancel(null);
       queryClient.invalidateQueries({ queryKey: ['admin-sessions'] });
     },
-    onError: (err: any) => {
+    onError: (err: Error) => {
       toast.error(err.message || 'Hủy phiên thất bại');
       setSessionToCancel(null);
     },
@@ -139,9 +153,7 @@ export default function AdminSessionsPage() {
   };
 
   const toggleCohort = (c: string) => {
-    setSelectedCohorts(prev => 
-      prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]
-    );
+    setSelectedCohorts((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
   };
 
   return (
@@ -152,19 +164,35 @@ export default function AdminSessionsPage() {
           <h2 className="text-xl font-semibold text-zinc-900 mb-4">Tạo Phiên Đăng ký</h2>
           <form onSubmit={handleCreate} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-zinc-700 mb-1">Mã học kỳ</label>
-              <input
-                type="text"
+              <label
+                htmlFor="semesterCode"
+                className="block text-sm font-medium text-zinc-700 mb-1"
+              >
+                Mã học kỳ
+              </label>
+              <select
+                id="semesterCode"
                 value={semesterCode}
                 onChange={(e) => setSemesterCode(e.target.value)}
-                placeholder="VD: HK1_2023_2024"
                 className="w-full rounded-lg border border-zinc-300 px-3 py-2 focus:border-zinc-500 focus:outline-none"
                 required
-              />
+              >
+                <option value="" disabled>
+                  -- Chọn học kỳ --
+                </option>
+                {availableSemesters?.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-zinc-700 mb-1">Thời gian bắt đầu</label>
+              <label htmlFor="startTime" className="block text-sm font-medium text-zinc-700 mb-1">
+                Thời gian bắt đầu
+              </label>
               <input
+                id="startTime"
                 type="datetime-local"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
@@ -173,8 +201,11 @@ export default function AdminSessionsPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-zinc-700 mb-1">Thời gian kết thúc</label>
+              <label htmlFor="endTime" className="block text-sm font-medium text-zinc-700 mb-1">
+                Thời gian kết thúc
+              </label>
               <input
+                id="endTime"
                 type="datetime-local"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
@@ -183,12 +214,17 @@ export default function AdminSessionsPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-zinc-700 mb-2">Khóa được phép đăng ký</label>
-              <div className="space-y-2 max-h-40 overflow-y-auto border border-zinc-200 rounded-lg p-3">
-                {availableCohorts?.map(c => (
+              <label htmlFor="cohorts" className="block text-sm font-medium text-zinc-700 mb-2">
+                Khóa được phép đăng ký
+              </label>
+              <div
+                id="cohorts"
+                className="space-y-2 max-h-40 overflow-y-auto border border-zinc-200 rounded-lg p-3"
+              >
+                {availableCohorts?.map((c) => (
                   <label key={c} className="flex items-center space-x-2 cursor-pointer">
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       checked={selectedCohorts.includes(c)}
                       onChange={() => toggleCohort(c)}
                       className="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
@@ -214,7 +250,7 @@ export default function AdminSessionsPage() {
       <div className="md:col-span-2">
         <section className="rounded-xl bg-white p-6 shadow-sm border border-zinc-200">
           <h2 className="text-xl font-semibold text-zinc-900 mb-4">Lịch trình & Trạng thái</h2>
-          
+
           {isLoading ? (
             <p className="text-zinc-500">Đang tải...</p>
           ) : sessions && sessions.length > 0 ? (
@@ -241,14 +277,14 @@ export default function AdminSessionsPage() {
                   upcoming: 'bg-blue-50 border-blue-300',
                   cancelled: 'bg-red-50 border-red-300 opacity-75',
                 };
-                
+
                 const badgeStyles = {
                   ended: 'bg-zinc-200 text-zinc-700',
                   active: 'bg-emerald-500 text-white animate-pulse',
                   upcoming: 'bg-blue-500 text-white',
                   cancelled: 'bg-red-500 text-white',
                 };
-                
+
                 const badgeText = {
                   ended: 'Đã kết thúc',
                   active: 'Đang hoạt động',
@@ -264,7 +300,9 @@ export default function AdminSessionsPage() {
                     <div className="flex items-start justify-between">
                       <div>
                         <div className="flex items-center space-x-3 mb-2">
-                          <span className={`px-2 py-1 rounded text-xs font-semibold ${badgeStyles[status]}`}>
+                          <span
+                            className={`px-2 py-1 rounded text-xs font-semibold ${badgeStyles[status]}`}
+                          >
                             {badgeText[status]}
                           </span>
                           <span className="text-sm font-medium text-zinc-800">
@@ -284,7 +322,7 @@ export default function AdminSessionsPage() {
                           <strong>Khóa:</strong> {session.allowed_cohorts.join(', ')}
                         </p>
                       </div>
-                      
+
                       {status === 'upcoming' && (
                         <button
                           onClick={() => setSessionToCancel(session)}
@@ -312,7 +350,8 @@ export default function AdminSessionsPage() {
             <h3 className="text-lg font-bold text-zinc-900 mb-2">Xác nhận Hủy Phiên</h3>
             <p className="text-zinc-600 mb-6">
               Bạn có chắc chắn muốn hủy phiên đăng ký bắt đầu từ{' '}
-              <strong>{new Date(sessionToCancel.start_time).toLocaleString('vi-VN')}</strong> không? Hành động này không thể hoàn tác.
+              <strong>{new Date(sessionToCancel.start_time).toLocaleString('vi-VN')}</strong> không?
+              Hành động này không thể hoàn tác.
             </p>
             <div className="flex justify-end space-x-3">
               <button
