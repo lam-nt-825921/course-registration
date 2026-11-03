@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import selectinload
 
 from src.domain.entities.registration import Course, CourseClass, ClassSchedule, Student, AcademicTranscript, Enrollment
@@ -72,6 +72,39 @@ class SQLCourseClassRepository:
             model.current_capacity = course_class.current_capacity
             self.session.add(model)
             await self.session.flush()
+
+    async def increment_capacity_atomic(self, class_id: UUID) -> bool:
+        """
+        Tăng current_capacity thêm 1 nguyên tử tại CSDL nếu và chỉ nếu current_capacity < max_capacity.
+        Đóng vai trò chốt chặn cuối cùng (Database-Level Invariant Guard) chống Overselling 100%.
+        """
+        stmt = (
+            update(CourseClassModel)
+            .where(
+                CourseClassModel.id == class_id,
+                CourseClassModel.current_capacity < CourseClassModel.max_capacity,
+            )
+            .values(current_capacity=CourseClassModel.current_capacity + 1)
+        )
+        result = await self.session.execute(stmt)
+        await self.session.flush()
+        return result.rowcount == 1
+
+    async def decrement_capacity_atomic(self, class_id: UUID) -> bool:
+        """
+        Giảm current_capacity đi 1 nguyên tử tại CSDL nếu và chỉ nếu current_capacity > 0.
+        """
+        stmt = (
+            update(CourseClassModel)
+            .where(
+                CourseClassModel.id == class_id,
+                CourseClassModel.current_capacity > 0,
+            )
+            .values(current_capacity=CourseClassModel.current_capacity - 1)
+        )
+        result = await self.session.execute(stmt)
+        await self.session.flush()
+        return result.rowcount == 1
 
     async def is_session_open_for_cohort(self, cohort: str) -> bool:
         now = datetime.now()
@@ -217,8 +250,19 @@ class SQLStudentRepository:
 class SQLEnrollmentRepository:
     def __init__(self, session: Session):
         self.session = session
+
+    async def is_already_enrolled(self, student_id: UUID, course_class_id: UUID) -> bool:
+        stmt = select(EnrollmentModel.id).where(
+            EnrollmentModel.student_id == student_id,
+            EnrollmentModel.course_class_id == course_class_id,
+            EnrollmentModel.status == "enrolled",
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().first() is not None
         
     async def create(self, enrollment: Enrollment):
+        if await self.is_already_enrolled(enrollment.student_id, enrollment.course_class.id):
+            raise ValueError("Bạn đã đăng ký lớp học phần này rồi")
         db_enrollment = EnrollmentModel(
             id=enrollment.id,
             student_id=enrollment.student_id,
@@ -227,6 +271,7 @@ class SQLEnrollmentRepository:
         )
         self.session.add(db_enrollment)
         await self.session.flush()
+
     async def cancel_enrollment(self, student_id: UUID, course_class_id: UUID) -> bool:
         stmt = select(EnrollmentModel).where(EnrollmentModel.student_id == student_id, EnrollmentModel.course_class_id == course_class_id, EnrollmentModel.status == 'enrolled')
         result = await self.session.execute(stmt)
