@@ -157,7 +157,7 @@ class Enrollment(Base):
     course_class = relationship("CourseClass", back_populates="enrollments")
 
     __table_args__ = (
-        UniqueConstraint("id", name="uq_enrollment_id"),
+        UniqueConstraint("student_id", "course_class_id", name="uq_student_course_class"),
     )
 
 
