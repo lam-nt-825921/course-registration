@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from src.infrastructure.database.session import get_db
 from src.infrastructure.repositories.sql_course_repository import SQLCourseClassRepository, SQLStudentRepository, SQLEnrollmentRepository
+from src.infrastructure.cache.slot_reservation_adapter import SlotReservationAdapter
 from src.use_cases.course_service import CourseService
 from src.application.security.auth import SECRET_KEY, ALGORITHM
 from src.infrastructure.database.models import Student
@@ -16,7 +17,8 @@ def get_course_service(db: AsyncSession = Depends(get_db)):
     class_repo = SQLCourseClassRepository(db)
     student_repo = SQLStudentRepository(db)
     enrollment_repo = SQLEnrollmentRepository(db)
-    return CourseService(class_repo, student_repo, enrollment_repo)
+    slot_adapter = SlotReservationAdapter()
+    return CourseService(class_repo, student_repo, enrollment_repo, slot_adapter=slot_adapter)
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
     try:

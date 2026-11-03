@@ -114,10 +114,17 @@ async def register_course(
     current_user: dict = Depends(get_current_student)
 ):
     try:
-        await service.register_course(payload.course_class_id, current_user["student_id"])
+        ip_addr = request.client.host if request.client else None
+        await service.register_course(
+            payload.course_class_id,
+            current_user["student_id"],
+            ip_address=ip_addr,
+        )
         return MessageResponse(message="Registration successful")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
 @router.delete("/register/{class_id}", response_model=MessageResponse, summary="Hủy đăng ký")
 async def cancel_registration(
@@ -128,10 +135,13 @@ async def cancel_registration(
 ):
     try:
         student_id = current_user["student_id"]
-        await service.cancel_registration(class_id, student_id)
+        ip_addr = request.client.host if request.client else None
+        await service.cancel_registration(class_id, student_id, ip_address=ip_addr)
         return MessageResponse(message="Cancellation successful")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
 @router.get("/enrollments/history", response_model=List[EnrollmentHistoryResponse], summary="Lịch sử đăng ký học các kỳ")
 async def get_enrollment_history(

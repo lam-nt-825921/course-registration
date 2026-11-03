@@ -2,7 +2,7 @@
 Domain Repository & Concurrency Ports (Hexagonal / Clean Architecture Interfaces).
 Tuyệt đối không import SQLAlchemy, Redis hay bất kỳ thư viện hạ tầng nào tại tầng Domain (NFR-03).
 """
-from typing import Optional, Protocol
+from typing import Any, Optional, Protocol
 from uuid import UUID
 from src.domain.entities.registration import CourseClass, Enrollment, Student
 
@@ -61,4 +61,54 @@ class IEnrollmentRepository(Protocol):
         ...
 
     async def is_already_enrolled(self, student_id: UUID, course_class_id: UUID) -> bool:
+        ...
+
+
+class ISlotReservationPort(Protocol):
+    """Port trừu tượng hóa cơ chế giữ chỗ nguyên tử trên RAM & khóa phân tán theo sinh viên."""
+
+    async def acquire_student_lock(self, student_id: UUID | str, ttl: int = 5) -> bool:
+        ...
+
+    async def release_student_lock(self, student_id: UUID | str) -> None:
+        ...
+
+    async def reserve_slot(
+        self,
+        class_id: UUID | str,
+        max_capacity: int,
+        course_class_repo: Optional[Any] = None,
+        initial_capacity: Optional[int] = None,
+    ) -> bool:
+        ...
+
+    async def release_slot(self, class_id: UUID | str) -> int:
+        ...
+
+    async def get_or_load_course_class(
+        self,
+        class_id: UUID,
+        course_class_repo: Optional[Any] = None,
+    ) -> Optional[CourseClass]:
+        ...
+
+    async def get_or_load_student(
+        self,
+        student_id: UUID,
+        student_repo: Optional[Any] = None,
+    ) -> Optional[Student]:
+        ...
+
+    async def invalidate_student_state(self, student_id: UUID | str) -> None:
+        ...
+
+    async def push_audit_log(
+        self,
+        student_id: UUID | str,
+        action: str,
+        class_code: str,
+        status: str = "SUCCESS",
+        ip_address: Optional[str] = None,
+        details: Optional[dict[str, Any]] = None,
+    ) -> None:
         ...
