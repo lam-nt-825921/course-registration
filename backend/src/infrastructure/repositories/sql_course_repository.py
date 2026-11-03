@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 from sqlalchemy.orm import Session
@@ -9,7 +10,9 @@ from src.infrastructure.database.models import (
     CourseClass as CourseClassModel, 
     Student as StudentModel,
     Enrollment as EnrollmentModel,
-    Course as CourseModel
+    Course as CourseModel,
+    RegistrationSession as RegistrationSessionModel,
+    AuditLog as AuditLogModel,
 )
 
 class SQLCourseClassRepository:
@@ -40,6 +43,16 @@ class SQLCourseClassRepository:
             schedules=schedules
         )
 
+    async def get_by_id(self, class_id: UUID) -> Optional[CourseClass]:
+        stmt = select(CourseClassModel).options(
+            selectinload(CourseClassModel.course).selectinload(CourseModel.prerequisites),
+            selectinload(CourseClassModel.schedules)
+        ).where(CourseClassModel.id == class_id)
+
+        result = await self.session.execute(stmt)
+        model = result.scalars().first()
+        return self._to_domain(model) if model else None
+
     async def get_by_id_for_update(self, class_id: UUID) -> Optional[CourseClass]:
         stmt = select(CourseClassModel).options(
             selectinload(CourseClassModel.course).selectinload(CourseModel.prerequisites),
@@ -59,6 +72,36 @@ class SQLCourseClassRepository:
             model.current_capacity = course_class.current_capacity
             self.session.add(model)
             await self.session.flush()
+
+    async def is_session_open_for_cohort(self, cohort: str) -> bool:
+        now = datetime.now()
+        stmt = select(RegistrationSessionModel).where(
+            RegistrationSessionModel.is_cancelled == False,
+            RegistrationSessionModel.start_time <= now,
+            RegistrationSessionModel.end_time >= now
+        )
+        result = await self.session.execute(stmt)
+        sessions = result.scalars().all()
+        for reg_session in sessions:
+            if cohort in reg_session.allowed_cohorts:
+                return True
+        return False
+
+    async def record_audit_log(
+        self,
+        student_id: UUID,
+        course_class_id: UUID,
+        action: str,
+        ip_address: Optional[str] = None,
+    ) -> None:
+        log = AuditLogModel(
+            student_id=student_id,
+            course_class_id=course_class_id,
+            action=action,
+            ip_address=ip_address,
+        )
+        self.session.add(log)
+        await self.session.flush()
 
     async def get_all(self, student_id=None, keyword=None, can_register=None, day_of_week=None, course_type=None, page=1, size=20) -> dict:
         stmt = select(CourseClassModel).options(

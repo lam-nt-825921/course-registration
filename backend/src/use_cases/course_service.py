@@ -1,13 +1,16 @@
 from uuid import UUID
 from typing import List, Optional
 from src.domain.entities.registration import CourseClass, Enrollment
-from datetime import datetime
-from sqlalchemy import select
-from src.infrastructure.database.models import RegistrationSession
+from src.domain.ports import ICourseClassRepository, IStudentRepository, IEnrollmentRepository
 import uuid
 
 class CourseService:
-    def __init__(self, course_class_repo, student_repo, enrollment_repo):
+    def __init__(
+        self,
+        course_class_repo: ICourseClassRepository,
+        student_repo: IStudentRepository,
+        enrollment_repo: IEnrollmentRepository,
+    ):
         self.course_class_repo = course_class_repo
         self.student_repo = student_repo
         self.enrollment_repo = enrollment_repo
@@ -16,19 +19,10 @@ class CourseService:
         # Pass filters to repository
         return await self.course_class_repo.get_all(student_id=student_id, keyword=keyword, can_register=can_register, day_of_week=day_of_week, course_type=course_type, page=page, size=size)
 
-    async def _check_session(self, student):
-        now = datetime.now()
-        stmt = select(RegistrationSession).where(
-            RegistrationSession.is_cancelled == False,
-            RegistrationSession.start_time <= now,
-            RegistrationSession.end_time >= now
-        )
-        result = await self.course_class_repo.session.execute(stmt)
-        sessions = result.scalars().all()
-        for session in sessions:
-            if student.cohort in session.allowed_cohorts:
-                return True
-        return False
+    async def _check_session(self, student) -> bool:
+        if not student:
+            return False
+        return await self.course_class_repo.is_session_open_for_cohort(student.cohort)
 
     async def register_course(self, class_id: UUID, student_id: UUID, ip_address: str = None) -> bool:
         student = await self.student_repo.get_by_id(student_id)
@@ -66,10 +60,12 @@ class CourseService:
         enrollment = Enrollment(id=uuid.uuid4(), student_id=student_id, course_class=course_class, status="enrolled")
         await self.enrollment_repo.create(enrollment)
         
-        from src.infrastructure.database.models import AuditLog
-        log = AuditLog(student_id=student_id, course_class_id=class_id, action="ENROLLED", ip_address=ip_address)
-        self.course_class_repo.session.add(log)
-        await self.course_class_repo.session.flush()
+        await self.course_class_repo.record_audit_log(
+            student_id=student_id,
+            course_class_id=class_id,
+            action="ENROLLED",
+            ip_address=ip_address,
+        )
         return True
 
     async def get_my_schedule(self, student_id: UUID) -> list:
@@ -96,10 +92,12 @@ class CourseService:
         course_class.current_capacity -= 1
         await self.course_class_repo.save(course_class)
         
-        from src.infrastructure.database.models import AuditLog
-        log = AuditLog(student_id=student_id, course_class_id=class_id, action="CANCELLED", ip_address=ip_address)
-        self.course_class_repo.session.add(log)
-        await self.course_class_repo.session.flush()
+        await self.course_class_repo.record_audit_log(
+            student_id=student_id,
+            course_class_id=class_id,
+            action="CANCELLED",
+            ip_address=ip_address,
+        )
         return True
         
     async def get_enrollment_history(self, student_id: UUID) -> list:
