@@ -33,18 +33,20 @@ const loginApi = async ({ studentId, password }: { studentId: string; password: 
 export default function LoginPage() {
   const [studentId, setStudentId] = useState('');
   const [password, setPassword] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
   const router = useRouter();
   const login = useAuthStore((state) => state.login);
 
   const mutation = useMutation({
     mutationFn: loginApi,
     onSuccess: (data) => {
+      setErrorMessage('');
       toast.success('Đăng nhập thành công');
       const token = data.access_token;
       const decoded = parseJwt(token);
       const role = decoded?.role || 'student';
       login(studentId, role, token);
-      
+
       if (role === 'admin') {
         router.push('/admin');
       } else {
@@ -52,7 +54,9 @@ export default function LoginPage() {
       }
     },
     onError: (error: Error) => {
-      toast.error(error.message);
+      // Giữ thông báo trên màn hình (vd. phải chờ 20 phút, phòng đăng ký đầy)
+      setErrorMessage(error.message);
+      toast.error(error.message, { duration: 8000 });
       if (error.message === 'Failed to fetch') {
         toast.info('Đăng nhập với chế độ Mock (API chưa có)');
         login(studentId, 'student', 'mock_token');
@@ -71,6 +75,7 @@ export default function LoginPage() {
       toast.warning('Vui lòng nhập mật khẩu');
       return;
     }
+    setErrorMessage('');
     mutation.mutate({ studentId, password });
   };
 
@@ -110,6 +115,15 @@ export default function LoginPage() {
               className="w-full rounded-lg border border-zinc-300 px-4 py-3 outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200"
             />
           </div>
+
+          {errorMessage && (
+            <div
+              role="alert"
+              className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+            >
+              {errorMessage}
+            </div>
+          )}
 
           <button
             type="submit"

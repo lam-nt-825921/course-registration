@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
 import Link from 'next/link';
+import SessionTimer from '@/components/SessionTimer';
+import { throwIfUnauthorized } from '@/lib/auth-fetch';
 
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -60,6 +62,7 @@ const fetchCourses = async (params: {
   const response = await fetch(url.toString(), {
     headers: { Authorization: `Bearer ${token}` },
   });
+  await throwIfUnauthorized(response);
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
     throw new Error(err.detail || 'Không thể tải danh sách học phần.');
@@ -72,6 +75,7 @@ const fetchMySchedule = async (): Promise<CourseClass[]> => {
   const response = await fetch(`${API_URL}/api/courses/my-schedule`, {
     headers: { Authorization: `Bearer ${token}` },
   });
+  await throwIfUnauthorized(response);
   if (!response.ok) throw new Error('Không thể tải thời khóa biểu.');
   return response.json();
 };
@@ -83,6 +87,7 @@ const registerCourse = async ({ courseClassId }: { courseClassId: string }) => {
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ course_class_id: courseClassId }),
   });
+  await throwIfUnauthorized(response);
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.detail || 'Đăng ký học phần thất bại.');
   return data;
@@ -94,6 +99,7 @@ const cancelRegistration = async (classId: string) => {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   });
+  await throwIfUnauthorized(response);
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.detail || 'Hủy đăng ký học phần thất bại.');
   return data;
@@ -304,6 +310,7 @@ function HomeContent() {
             </p>
           </div>
           <div className="flex items-center gap-4">
+            <SessionTimer />
             <Link
               href="/history"
               className="text-sm font-medium text-zinc-700 hover:text-zinc-900 transition"
@@ -417,10 +424,10 @@ function HomeContent() {
                           const scheduleText =
                             course.schedules.length > 0
                               ? course.schedules
-                                  .map(
-                                    (s) => `T${s.day_of_week}(${s.start_period}-${s.end_period})`
-                                  )
-                                  .join(', ')
+                                .map(
+                                  (s) => `T${s.day_of_week}(${s.start_period}-${s.end_period})`
+                                )
+                                .join(', ')
                               : 'Chưa xếp lịch';
 
                           const isLastElement = courses.length === index + 1;
