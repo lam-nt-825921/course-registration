@@ -9,6 +9,7 @@ from src.api.dependencies import get_current_admin
 from src.api.schemas import MessageResponse
 from src.infrastructure.database.session import get_db
 from src.use_cases.admin_service import AdminService
+from src.infrastructure.cache.session_lease_adapter import SessionLeaseAdapter
 
 router = APIRouter()
 
@@ -35,9 +36,9 @@ class RegistrationSessionResponse(BaseModel):
 
 class AuditLogResponse(BaseModel):
     id: int
-    student_id: UUID
+    student_id: Optional[UUID] = None
     action: str
-    course_class_id: UUID
+    course_class_id: Optional[UUID] = None
     timestamp: datetime
     ip_address: Optional[str] = None
 
@@ -54,6 +55,22 @@ async def open_registration_session(
         raise HTTPException(status_code=400, detail="Thời gian bắt đầu phải nhỏ hơn thời gian kết thúc")
     await service.create_session(payload.semester_code, payload.start_time, payload.end_time, payload.allowed_cohorts)
     return MessageResponse(message="Phiên đăng ký đã được mở thành công")
+
+class ToggleSessionLimitRequest(BaseModel):
+    enabled: bool
+
+@router.post("/sessions/toggle-limit", response_model=MessageResponse, summary="Bật/tắt giới hạn phiên 30p đăng nhập + 20p chờ")
+async def toggle_session_limit(
+    payload: ToggleSessionLimitRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    await SessionLeaseAdapter.set_limit_enabled(payload.enabled)
+    state = "BẬT" if payload.enabled else "TẮT"
+    return MessageResponse(message=f"Đã {state} giới hạn phiên 30 phút đăng nhập + 20 phút chờ")
+
+@router.get("/sessions/limit-status", summary="Xem trạng thái giới hạn phiên 30p+20p")
+async def get_session_limit_status(current_admin: dict = Depends(get_current_admin)):
+    return {"enabled": await SessionLeaseAdapter.is_limit_enabled()}
 
 @router.get("/sessions", response_model=List[RegistrationSessionResponse], summary="Lấy danh sách các phiên đăng ký")
 async def get_registration_sessions(
