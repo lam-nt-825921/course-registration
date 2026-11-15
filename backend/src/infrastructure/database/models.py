@@ -104,9 +104,9 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    student_id = Column(UUID(as_uuid=True), ForeignKey("students.user_id"), nullable=False)
-    course_class_id = Column(UUID(as_uuid=True), ForeignKey("course_classes.id"), nullable=False)
-    action = Column(String, nullable=False) # 'ENROLLED', 'CANCELLED'
+    student_id = Column(UUID(as_uuid=True), ForeignKey("students.user_id"), nullable=True)  # null khi spam theo IP
+    course_class_id = Column(UUID(as_uuid=True), ForeignKey("course_classes.id"), nullable=True)  # null với LOGIN/LOGOUT/RATE_LIMIT
+    action = Column(String, nullable=False) # 'ENROLLED', 'CANCELLED', 'LOGIN', 'LOGOUT', 'RATE_LIMIT_EXCEEDED'
     ip_address = Column(String, nullable=True)
     created_at = Column(DateTime, default=func.now())
 
