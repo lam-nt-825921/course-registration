@@ -76,6 +76,31 @@ const fetchSemesters = async (token: string): Promise<string[]> => {
   return response.json();
 };
 
+const fetchLimitStatus = async (token: string): Promise<boolean> => {
+  const response = await fetch(`${API_URL}/api/admin/sessions/limit-status`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Failed to fetch limit status');
+  const data = await response.json();
+  return data.enabled;
+};
+
+const toggleLimit = async ({ enabled, token }: { enabled: boolean; token: string }) => {
+  const response = await fetch(`${API_URL}/api/admin/sessions/toggle-limit`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ enabled }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || 'Không đổi được trạng thái giới hạn phiên');
+  }
+  return response.json();
+};
+
 export default function AdminSessionsPage() {
   const { token } = useAuthStore();
   const queryClient = useQueryClient();
@@ -103,6 +128,21 @@ export default function AdminSessionsPage() {
     queryKey: ['admin-semesters'],
     queryFn: () => fetchSemesters(token as string),
     enabled: !!token,
+  });
+
+  const { data: limitEnabled, isLoading: limitLoading } = useQuery({
+    queryKey: ['admin-session-limit'],
+    queryFn: () => fetchLimitStatus(token as string),
+    enabled: !!token,
+  });
+
+  const limitMutation = useMutation({
+    mutationFn: toggleLimit,
+    onSuccess: (data) => {
+      toast.success(data.message);
+      queryClient.invalidateQueries({ queryKey: ['admin-session-limit'] });
+    },
+    onError: (err: Error) => toast.error(err.message),
   });
 
   const createMutation = useMutation({
@@ -160,6 +200,31 @@ export default function AdminSessionsPage() {
     <div className="grid gap-6 md:grid-cols-3">
       {/* Cột 1: Form tạo */}
       <div className="md:col-span-1 space-y-6">
+        <section className="rounded-xl bg-white p-6 shadow-sm border border-zinc-200">
+          <h2 className="text-xl font-semibold text-zinc-900 mb-2">Giới hạn Phiên đăng nhập</h2>
+          <p className="text-sm text-zinc-600 mb-4">
+            30p/lần đăng nhập - 20p chờ sau khi đăng xuất
+          </p>
+          <div className="flex items-center justify-between">
+            <span
+              className={`px-2 py-1 rounded text-xs font-semibold ${limitEnabled ? 'bg-emerald-500 text-white' : 'bg-zinc-200 text-zinc-700'
+                }`}
+            >
+              {limitLoading ? 'Đang tải...' : limitEnabled ? 'Đang BẬT' : 'Đang TẮT'}
+            </span>
+            <button
+              type="button"
+              disabled={limitLoading || limitMutation.isPending || !token}
+              onClick={() =>
+                token && limitMutation.mutate({ enabled: !limitEnabled, token })
+              }
+              className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 transition disabled:opacity-50"
+            >
+              {limitMutation.isPending ? 'Đang xử lý...' : limitEnabled ? 'Tắt' : 'Bật'}
+            </button>
+          </div>
+        </section>
+
         <section className="rounded-xl bg-white p-6 shadow-sm border border-zinc-200">
           <h2 className="text-xl font-semibold text-zinc-900 mb-4">Tạo Phiên Đăng ký</h2>
           <form onSubmit={handleCreate} className="space-y-4">

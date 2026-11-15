@@ -7,8 +7,8 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 type AuditLog = {
   id: number;
-  student_id: string;
-  course_class_id: string;
+  student_id: string | null;
+  course_class_id: string | null;
   action: string;
   timestamp: string;
   ip_address: string;
@@ -63,22 +63,27 @@ export default function AdminLogsPage() {
                   <td className="whitespace-nowrap px-4 py-3 font-medium text-zinc-900">
                     {new Date(log.timestamp).toLocaleString('vi-VN')}
                   </td>
-                  <td className="px-4 py-3">{log.student_id}</td>
+                  <td className="px-4 py-3">{log.student_id ?? '-'}</td>
                   <td className="px-4 py-3">
                     <span
-                      className={`px-2 py-1 rounded text-xs font-medium ${
-                        log.action === 'ENROLLED'
+                      className={`px-2 py-1 rounded text-xs font-medium ${log.action === 'ENROLLED'
                           ? 'bg-blue-100 text-blue-700'
                           : log.action === 'CANCELLED'
                             ? 'bg-orange-100 text-orange-700'
-                            : 'bg-zinc-100 text-zinc-700'
-                      }`}
+                            : log.action === 'LOGIN'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : log.action === 'LOGOUT'
+                                ? 'bg-purple-100 text-purple-700'
+                                : log.action === 'RATE_LIMIT_EXCEEDED'
+                                  ? 'bg-red-100 text-red-700'
+                                  : 'bg-zinc-100 text-zinc-700'
+                        }`}
                     >
                       {log.action}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-zinc-500 font-mono text-xs">
-                    {log.course_class_id}
+                    {log.course_class_id ?? '-'}
                   </td>
                   <td className="px-4 py-3 text-zinc-500">{log.ip_address || 'N/A'}</td>
                 </tr>
