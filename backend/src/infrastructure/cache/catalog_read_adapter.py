@@ -3,7 +3,6 @@ from datetime import datetime
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.entities.registration import ClassSchedule
@@ -16,28 +15,29 @@ from src.infrastructure.cache.redis_keys import (
     student_state_key,
 )
 from src.infrastructure.cache.warmup_service import CacheWarmupService
-from src.infrastructure.database.models import Student as StudentModel
 from src.infrastructure.repositories.sql_course_repository import SQLStudentRepository
 
 
 class CatalogReadAdapter:
+    @staticmethod
+    def _decode(value):
+        try:
+            return json.loads(value)
+        except (ValueError, TypeError) as exc:
+            raise HTTPException(503, "Dữ liệu Redis không hợp lệ; cần nạp lại cache") from exc
+
     @staticmethod
     async def get_or_load_student_state(student_id: UUID, db: AsyncSession) -> dict:
         redis = get_redis()
         key = student_state_key(str(student_id))
         cached = await redis.get(key)
         if cached is not None:
-            return json.loads(cached)
+            return CatalogReadAdapter._decode(cached)
 
         student = await SQLStudentRepository(db).get_by_id(student_id)
         if student is None:
             raise HTTPException(status_code=404, detail="Không tìm thấy sinh viên")
 
-        # The repository's domain Student does not expose major_id.
-        result = await db.execute(
-            select(StudentModel.major_id).where(StudentModel.user_id == student_id)
-        )
-        major_id = result.scalar_one_or_none()
         enrolled_classes = []
         for enrollment in student.enrollments:
             if enrollment.status != "enrolled":
@@ -63,7 +63,7 @@ class CatalogReadAdapter:
 
         state = {
             "cohort": student.cohort,
-            "major_id": major_id,
+            "major_id": student.major_id,
             "passed_course_ids": sorted(
                 {t.course_id for t in student.transcripts if t.status == "passed"}
             ),
@@ -81,7 +81,9 @@ class CatalogReadAdapter:
             await CacheWarmupService.warmup_catalog_and_session(db)
             cached = await redis.get(ACTIVE_SESSION_CONFIG_KEY)
 
-        sessions = json.loads(cached) if cached is not None else []
+        sessions = CatalogReadAdapter._decode(cached) if cached is not None else []
+        if not isinstance(sessions, list):
+            raise HTTPException(503, "session:active_config phải là danh sách phiên")
         now = datetime.now()
         for session in sessions:
             if (
@@ -106,9 +108,12 @@ class CatalogReadAdapter:
         for catalog, counter in zip(values[:count], values[count:]):
             # Do not infer available seats from an incomplete cache record.
             if catalog is None or counter is None:
-                continue
-            course_class = json.loads(catalog)
-            course_class["current_capacity"] = int(counter)
+                raise HTTPException(503, "Catalog hoặc sĩ số chưa được nạp đầy đủ")
+            course_class = CatalogReadAdapter._decode(catalog)
+            try:
+                course_class["current_capacity"] = int(counter)
+            except (ValueError, TypeError) as exc:
+                raise HTTPException(503, "Sĩ số Redis không hợp lệ") from exc
             classes.append(course_class)
         return classes
 
@@ -127,7 +132,7 @@ class CatalogReadAdapter:
             raise HTTPException(status_code=422, detail="page và size phải lớn hơn 0")
 
         redis = get_redis()
-        if await redis.get(CATALOG_READY_KEY) is None:
+        if await redis.get(CATALOG_READY_KEY) != "1":
             await CacheWarmupService.warmup_catalog_and_session(db)
 
         state = await CatalogReadAdapter.get_or_load_student_state(student_id, db)
@@ -219,6 +224,8 @@ class CatalogReadAdapter:
         class_ids = [course_class["class_id"] for course_class in state["enrolled_classes"]]
         if not class_ids:
             return []
+        if await get_redis().get(CATALOG_READY_KEY) != "1":
+            await CacheWarmupService.warmup_catalog_and_session(db)
         classes = await CatalogReadAdapter._load_classes_from_ram(class_ids)
         taken_ids = set(state["taken_course_ids"])
         for course_class in classes:

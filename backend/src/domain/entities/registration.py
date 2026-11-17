@@ -54,6 +54,7 @@ class Student:
     cohort: str = ""
     enrollments: List[Enrollment] = field(default_factory=list)
     transcripts: List[AcademicTranscript] = field(default_factory=list)
+    major_id: int | None = None
 
     def get_total_registered_credits(self) -> int:
         return sum(e.course_class.course.credits for e in self.enrollments if e.course_class.course.course_type != "physical_education" and e.status == "enrolled")

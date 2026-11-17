@@ -169,7 +169,7 @@ class SQLStudentRepository:
             )
             enrollments.append(Enrollment(id=e.id, student_id=e.student_id, course_class=cc_domain, status=e.status.value if hasattr(e.status, 'value') else e.status))
             
-        return Student(id=model.user_id, cohort=model.cohort, enrollments=enrollments, transcripts=transcripts)
+        return Student(id=model.user_id, cohort=model.cohort, enrollments=enrollments, transcripts=transcripts, major_id=model.major_id)
 
 class SQLEnrollmentRepository:
     def __init__(self, session: Session):

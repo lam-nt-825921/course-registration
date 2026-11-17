@@ -80,6 +80,8 @@ class CourseService:
 
     async def cancel_registration(self, class_id: UUID, student_id: UUID, ip_address: str = None) -> bool:
         student = await self.student_repo.get_by_id(student_id)
+        if not student:
+            raise ValueError("Không tìm thấy sinh viên")
         if not await self._check_session(student):
             raise ValueError("Ngoài thời gian đăng ký của bạn")
             
