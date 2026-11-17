@@ -1,5 +1,7 @@
 import pytest
 from uuid import uuid4
+from unittest.mock import AsyncMock, patch
+from src.infrastructure.database.session import get_db
 from fastapi.testclient import TestClient
 from main import app
 from src.api.dependencies import get_course_service, get_current_student
@@ -36,7 +38,8 @@ app.dependency_overrides[get_current_student] = override_get_current_student
 def test_get_courses():
     response = client.get("/api/courses/")
     assert response.status_code == 200
-    assert response.json() == []
+    assert response.json()["items"] == []
+    assert response.json()["total"] == 0
 
 def test_register_course_success():
     payload = {
@@ -75,3 +78,15 @@ def test_get_enrollment_history():
     response = client.get("/api/courses/enrollments/history")
     assert response.status_code == 200
     assert isinstance(response.json(), list)
+
+
+@pytest.fixture(autouse=True)
+def isolate_course_reads():
+    saved = app.dependency_overrides.copy()
+    app.dependency_overrides[get_course_service] = lambda: MockCourseService()
+    app.dependency_overrides[get_current_student] = override_get_current_student
+    app.dependency_overrides[get_db] = lambda: AsyncMock()
+    page = dict(items=[], total=0, page=1, size=20, pages=0, next=None, prev=None)
+    with patch("src.api.endpoints.courses.CatalogReadAdapter.query_courses_from_ram", new=AsyncMock(return_value=page)), patch("src.api.endpoints.courses.CatalogReadAdapter.get_my_schedule_from_ram", new=AsyncMock(return_value=[])), patch("src.api.endpoints.courses.invalidate_registration_cache", new=AsyncMock()):
+        yield
+    app.dependency_overrides = saved

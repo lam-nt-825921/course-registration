@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from redis.exceptions import RedisError
+from fastapi.responses import JSONResponse
 from src.api.endpoints import courses
 from src.api.auth import endpoints as auth
 from src.application.security.rate_limit import limiter
@@ -31,6 +33,11 @@ app.add_middleware(
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+@app.exception_handler(RedisError)
+async def redis_unavailable(request, exc):
+    return JSONResponse(status_code=503, content={"detail": "Redis chưa sẵn sàng; vui lòng thử lại"})
 
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(courses.router, prefix="/api/courses", tags=["Courses"])
