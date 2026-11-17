@@ -5,6 +5,7 @@ from sqlalchemy.future import select
 from sqlalchemy import desc
 from sqlalchemy.orm import selectinload
 
+from src.infrastructure.cache.warmup_service import CacheWarmupService
 from src.infrastructure.database.models import RegistrationSession, AuditLog, Semester
 
 class AdminService:
@@ -40,6 +41,7 @@ class AdminService:
         )
         self.session.add(new_session)
         await self.session.commit()
+        await CacheWarmupService.warmup_catalog_and_session(self.session, force_reset_slots=True)
         return new_session
 
     async def cancel_session(self, session_id: int):
@@ -57,6 +59,7 @@ class AdminService:
 
         session.is_cancelled = True
         await self.session.commit()
+        await CacheWarmupService.warmup_catalog_and_session(self.session, force_reset_slots=False)
         return session
 
     async def get_logs(self):
