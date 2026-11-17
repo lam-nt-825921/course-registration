@@ -55,3 +55,19 @@ def index_type_key(course_type: str) -> str:
 def index_major_key(major_id: int) -> str:
     """Redis Set chứa danh sách class_id thuộc ngành học."""
     return f"index:major:{major_id}"
+
+
+def ratelimit_key(actor_key: str, second: int) -> str:
+    """Bộ đếm số request trong mỗi giây của actor (user hoặc IP)."""
+    return f"rl:{actor_key}:{second}"
+
+
+def spam_hits_key(actor_key: str) -> str:
+    """Bộ đếm số lần vi phạm rate limit (429) liên tiếp trong cửa sổ 60s."""
+    return f"spam:hits:{actor_key}"
+
+
+def blacklist_key(actor_key: str) -> str:
+    """Cờ khóa tạm thời 15 phút đối với tài khoản/IP spam vượt ngưỡng."""
+    return f"blacklist:{actor_key}"
+

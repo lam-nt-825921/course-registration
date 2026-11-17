@@ -1,3 +1,4 @@
+import asyncio
 import os
 from datetime import datetime, timedelta, timezone
 import jwt
@@ -14,6 +15,13 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
+
+async def verify_password_async(plain_password: str, hashed_password: str) -> bool:
+    """Chạy BCrypt trên threadpool để không chặn event loop."""
+    return await asyncio.to_thread(verify_password, plain_password, hashed_password)
+
+async def get_password_hash_async(password: str) -> str:
+    return await asyncio.to_thread(get_password_hash, password)
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     to_encode = data.copy()

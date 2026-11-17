@@ -326,13 +326,17 @@ class SlotReservationAdapter:
         Đẩy nhật ký kiểm toán bất đồng bộ vào hàng đợi Redis LIST (LPUSH audit:queue)
         phục vụ NFR-04 mà không chặn luồng ghi chính.
         """
+        extra = details or {}
+        now_naive = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
         payload = {
             "student_id": str(student_id),
+            "course_class_id": extra.get("course_class_id"),
             "action": action,
             "status": status,
             "class_code": class_code,
             "ip_address": ip_address,
-            "details": details or {},
+            "details": extra,
+            "ts": now_naive,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
         try:

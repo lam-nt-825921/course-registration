@@ -14,3 +14,9 @@ redis_pool = redis.ConnectionPool.from_url(
 def get_redis() -> redis.Redis:
     """Trả về Redis async client sử dụng chung ConnectionPool."""
     return redis.Redis(connection_pool=redis_pool)
+
+
+async def close_redis() -> None:
+    """Đóng toàn bộ kết nối trong Redis ConnectionPool khi tắt ứng dụng."""
+    await redis_pool.disconnect()
+

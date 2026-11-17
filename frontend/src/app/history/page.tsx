@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
+import SessionTimer from '@/components/SessionTimer';
+import { throwIfUnauthorized } from '@/lib/auth-fetch';
 
 type ClassSchedule = {
   day_of_week: number;
@@ -37,6 +39,7 @@ const fetchEnrollmentHistory = async (): Promise<EnrollmentHistory[]> => {
       Authorization: `Bearer ${token}`,
     },
   });
+  await throwIfUnauthorized(response);
   if (!response.ok) {
     throw new Error('Không thể tải lịch sử đăng ký.');
   }
@@ -77,6 +80,7 @@ export default function HistoryPage() {
             </p>
           </div>
           <div className="flex items-center gap-4">
+            <SessionTimer />
             <Link
               href="/"
               className="text-sm font-medium text-zinc-700 hover:text-zinc-900 transition"
@@ -115,7 +119,7 @@ export default function HistoryPage() {
                 </div>
                 <div className="divide-y divide-zinc-200">
                   {semester.course_classes.map((course) => {
-                    const scheduleText = course.schedules.length > 0 
+                    const scheduleText = course.schedules.length > 0
                       ? course.schedules.map(s => `T${s.day_of_week} (${s.start_period}-${s.end_period})`).join(', ')
                       : 'Chưa xếp lịch';
                     return (
